@@ -1,5 +1,5 @@
 <template>
-  <div :class="[b(),{'avue--view':isView}]"
+  <div :class="[b(),{'avue--view':isView,'avue--detail':isDetail}]"
        :style="{width:setPx(parentOption.formWidth,'100%')}">
     <el-form ref="form"
              status-icon
@@ -10,41 +10,50 @@
              :size="controlSize"
              :label-width="setPx(parentOption.labelWidth,labelWidth)"
              :rules="formRules">
-      <el-tabs v-model="activeName"
-               :type="tabsType"
-               v-if="isTabs">
-        <el-tab-pane v-for="(item,index) in columnOption"
-                     v-if="!item.display"
-                     :name="index+''">
-          <span slot="label">
-            <slot :name="item.prop+'Header'"
-                  v-if="$slots[item.prop+'Header']"></slot>
-            <template v-else>
-              <i :class="item.icon">&nbsp;</i>
-              {{item.label}}
-            </template>
-          </span>
-        </el-tab-pane>
-      </el-tabs>
-      <el-row :span="24">
+      <el-row :span="24"
+              :class="{'avue-form__tabs':isTabs}">
         <avue-group v-for="(item,index) in columnOption"
                     :key="item.prop"
-                    v-show="isTabs?index==activeName:true"
+                    :tabs="isTabs"
                     :display="item.display"
                     :icon="item.icon"
+                    :index="index"
                     :header="!isTabs"
+                    :active="activeName"
                     :card="parentOption.card"
                     :label="item.label">
+          <el-tabs slot="tabs"
+                   v-model="activeName"
+                   :class="b('tabs')"
+                   :type="tabsType"
+                   v-if="isTabs&&index == 1">
+            <el-tab-pane v-for="(item,index) in columnOption"
+                         v-if="!item.display && index!=0"
+                         :key="index"
+                         :name="index+''">
+              <span slot="label">
+                <slot :name="item.prop+'Header'"
+                      v-if="$slots[item.prop+'Header']"></slot>
+                <template v-else>
+                  <i :class="item.icon">&nbsp;</i>
+                  {{item.label}}
+                </template>
+              </span>
+            </el-tab-pane>
+          </el-tabs>
           <template slot="header"
                     v-if="$slots[item.prop+'Header']">
             <slot :name="item.prop+'Header'"></slot>
           </template>
-          <div :class="b('group')">
+          <div :class="b('group')"
+               v-show="isGroupShow(item,index)">
             <template v-if="vaildDisplay(column)"
                       v-for="(column,cindex) in item.column">
               <el-col :key="column.prop"
                       :style="{paddingLeft:setPx((parentOption.gutter ||20)/2),paddingRight:setPx((parentOption.gutter ||20)/2)}"
-                      :md="column.span || itemSpanDefault"
+                      :span="getSpan(column)"
+                      :md="getSpan(column)"
+                      :sm="12"
                       :xs="24"
                       :offset="column.offset || 0"
                       :class="b('row')">
@@ -81,7 +90,7 @@
                           :column="column"
                           :label="form['$'+column.prop]"
                           :size="column.size || controlSize"
-                          :disabled="vaildDisabled(column)"
+                          :disabled="isDetail || vaildDisabled(column) || allDisabled"
                           :dic="DIC[column.prop]"
                           :name="column.prop"
                           v-if="column.formslot"></slot>
@@ -95,16 +104,29 @@
                                :upload-after="uploadAfter"
                                :upload-delete="uploadDelete"
                                :upload-preview="uploadPreview"
-                               :disabled="vaildDisabled(column) || allDisabled"
+                               :upload-error="uploadError"
+                               :disabled="isDetail || vaildDisabled(column) || allDisabled"
                                v-model="form[column.prop]"
                                :enter="parentOption.enter"
                                @enter="submit"
                                @change="column.cascader?handleChange(item.column,cindex):''">
+                      <template :slot="citem.prop"
+                                slot-scope="scope"
+                                v-for="citem in ((column.children || {}).column || [])">
+                        <slot :row="scope.row"
+                              :dic="scope.dic"
+                              v-if="citem.slot"
+                              :size="scope.size"
+                              :name="citem.prop"
+                              :label="scope.label"></slot>
+                      </template>
                       <template :slot="column.prop+'Type'"
-                                slot-scope="{item,label,value}"
+                                slot-scope="{item,label,value,node,data}"
                                 v-if="column.typeslot">
                         <slot :name="column.prop+'Type'"
                               :item="item"
+                              :node="node"
+                              :data="data"
                               :value="value"
                               :label="label"></slot>
                       </template>
@@ -117,20 +139,21 @@
                    :style="{width:(column.count/24*100)+'%'}"
                    v-if="column.row && column.span!==24 && column.count"></div>
             </template>
-            <form-menu v-if="!isMenu">
-              <template slot-scope="{size}"
+            <slot name="search"></slot>
+            <form-menu v-if="!isDetail && !isMenu">
+              <template slot-scope="scope"
                         slot="menuForm">
                 <slot name="menuForm"
-                      :size="size"></slot>
+                      v-bind="scope"></slot>
               </template>
             </form-menu>
           </div>
         </avue-group>
-        <form-menu v-if="isMenu">
-          <template slot-scope="{size}"
+        <form-menu v-if="!isDetail && isMenu">
+          <template slot-scope="scope"
                     slot="menuForm">
             <slot name="menuForm"
-                  :size="size"></slot>
+                  v-bind="scope"></slot>
           </template>
         </form-menu>
       </el-row>
@@ -147,7 +170,7 @@ import init from "../../core/crud/init";
 import formTemp from '../../core/components/form/index'
 import { getComponent, getPlaceholder, formInitVal, calcCount, calcCascader } from "core/dataformat";
 import { sendDic } from "core/dic";
-import { filterDefaultParams } from 'utils/util'
+import { filterDefaultParams, clearVal } from 'utils/util'
 import mock from "utils/mock";
 import formMenu from './menu'
 export default create({
@@ -205,20 +228,29 @@ export default create({
     isMenu () {
       return this.columnOption.length != 1
     },
+    isDetail () {
+      return this.option.detail
+    },
     isAdd () {
       return this.boxType === "add"
     },
     isTabs () {
       return this.parentOption.tabs;
     },
-    tabsType () {
-      return this.parentOption.tabsType;
-    },
     isEdit () {
       return this.boxType === "edit"
     },
     isView () {
       return this.boxType === "view"
+    },
+    disabled () {
+      return this.parentOption.disabled
+    },
+    readonly () {
+      return this.parentOption.readonly
+    },
+    tabsType () {
+      return this.parentOption.tabsType;
     },
     propOption () {
       let list = [];
@@ -271,22 +303,22 @@ export default create({
     boxType: function () {
       return this.parentOption.boxType;
     },
+    isPrint () {
+      return this.vaildData(this.parentOption.printBtn, false)
+    },
     isMock () {
-      return this.vaildData(this.parentOption.mock, false);
+      return this.vaildData(this.parentOption.mockBtn, false);
     },
     menuSpan () {
       return this.parentOption.menuSpan || 24;
     },
   },
   props: {
-    disabled: {
-      type: Boolean,
-      default: false
-    },
     uploadBefore: Function,
     uploadAfter: Function,
     uploadDelete: Function,
     uploadPreview: Function,
+    uploadError: Function,
     value: {
       type: Object,
       required: true,
@@ -308,6 +340,16 @@ export default create({
   methods: {
     getComponent,
     getPlaceholder,
+    getSpan (column) {
+      return this.parentOption.span || column.span || this.itemSpanDefault
+    },
+    isGroupShow (item, index) {
+      if (this.isTabs) {
+        return index == this.activeName || index == 0
+      } else {
+        return true;
+      }
+    },
     forEachLabel () {
       this.columnOption.forEach(ele => {
         ele.column.forEach(column => {
@@ -339,28 +381,12 @@ export default create({
     validateField (val) {
       return this.$refs.form.validateField(val);
     },
-    //搜索指定的属性配置
-    findColumnIndex (prop, group = false) {
-      let list = [];
-      let result;
-      this.columnOption.forEach((column, index) => {
-        const val = this.findArray(column.column, prop, "prop");
-        if (val !== -1) {
-          list.push(index);
-          list.push(val)
-          result = val;
-        }
-      });
-      return group ? list : result
-    },
     updateDic (prop, list) {
-      const columnList = this.findColumnIndex(prop, true);
-      const groupIndex = columnList[0];//分组序号
-      const columnIndex = columnList[1];//列序号
-      const column = this.columnOption[groupIndex].column[columnIndex];
+      const column = this.findObject(this.columnOption, prop);
       if (this.validatenull(list) && !this.validatenull(column.dicUrl)) {
         sendDic({
           url: column.dicUrl,
+          formatter: column.dicFormatter,
           resKey: (column.props || {}).res
         }).then(list => {
           this.$set(this.DIC, prop, list);
@@ -406,7 +432,7 @@ export default create({
           });
         }
         // 根据当前节点值获取下一个节点的字典
-        sendDic({ url: columnNext.dicUrl.replace("{{key}}", value), resKey: (columnNext.props || {}).res, formatter: columnNext.dicFormatter }).then(
+        sendDic({ url: (columnNext.dicUrl || '').replace("{{key}}", value), resKey: (columnNext.props || {}).res, formatter: columnNext.dicFormatter }).then(
           res => {
             const dic = Array.isArray(res) ? res : [];
             // 修改字典
@@ -424,6 +450,11 @@ export default create({
       this.forEachLabel();
       this.$emit("input", this.form);
     },
+    handlePrint () {
+      this.$Print({
+        html: this.$el.innerHTML
+      });
+    },
     handleMock () {
       if (this.isMock) {
         this.columnOption.forEach(column => {
@@ -435,7 +466,7 @@ export default create({
             this.clearValidate();
           }
         });
-        this.$message.success("模拟数据填充成功");
+        this.$emit('mock-change', this.form);
       }
     },
     // 验证表单是否禁止
@@ -492,12 +523,16 @@ export default create({
     },
     resetForm () {
       this.resetFields();
+      this.clearValidate();
+      this.clearVal();
+      this.$emit("input", this.form);
       this.$emit("reset-change");
+    },
+    clearVal () {
+      this.form = clearVal(this.form)
     },
     resetFields () {
       this.$refs.form.resetFields();
-      this.clearValidate();
-      this.$emit("input", this.form);
     },
     validate (callback) {
       this.$refs["form"].validate(valid => callback(valid));
@@ -514,6 +549,10 @@ export default create({
           this.show();
           this.$emit("submit", filterDefaultParams(this.form, this.parentOption.translate), this.hide);
         }
+        this.asyncValidator(this.formRules, this.form).then(() => {
+        }).catch(err => {
+          this.$emit("error", err);
+        })
       });
     }
   }

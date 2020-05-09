@@ -3,12 +3,16 @@
     <!-- 搜索组件 -->
     <header-search v-model="searchForm"
                    ref="headerSearch">
-      <template slot="search">
-        <slot name="search"></slot>
+      <template slot="search"
+                slot-scope="{size,row}">
+        <slot name="search"
+              :row="row"
+              :size="size"></slot>
       </template>
       <template slot="searchMenu"
-                slot-scope="{size}">
+                slot-scope="{size,row}">
         <slot name="searchMenu"
+              :row="row"
               :size="size"></slot>
       </template>
       <template slot-scope="{value,column,dic,size,label,disabled}"
@@ -56,7 +60,7 @@
               :class="{'avue-crud--indeterminate':vaildData(tableOption.indeterminate,false)}"
               :size="controlSize"
               :lazy="vaildData(tableOption.lazy,false)"
-              :load="treeload"
+              :load="treeLoad"
               :tree-props="tableOption.treeProps || {}"
               :expand-row-keys="tableOption.expandRowKeys"
               :default-expand-all="tableOption.defaultExpandAll"
@@ -164,7 +168,8 @@
                 :name="item.prop"></slot>
         </template>
       </column>
-      <el-table-column :fixed="vaildData(tableOption.menuFixed,config.menuFixed)"
+      <el-table-column :class="b('btn')"
+                       :fixed="vaildData(tableOption.menuFixed,config.menuFixed)"
                        v-if="vaildData(tableOption.menu,config.menu)"
                        :label="t('crud.menu')"
                        :align="tableOption.menuAlign || config.menuAlign"
@@ -172,6 +177,7 @@
                        :width="isMobile?(tableOption.menuXsWidth || config.menuXsWidth):( tableOption.menuWidth || config.menuWidth)">
         <template slot-scope="scope">
           <el-dropdown v-if="menuType==='menu'"
+                       :size="isMediumSize"
                        style="margin-right:9px;">
             <el-button type="primary"
                        :size="isMediumSize">
@@ -248,17 +254,16 @@
                 :page="page"></table-page>
     <!-- 表单 -->
     <dialog-form ref="dialogForm"
-                 :columnFormOption="columnFormOption"
                  v-model="tableForm">
       <template slot-scope="scope"
                 v-for="item in columnFormOption"
                 :slot="item.prop">
         <slot v-bind="Object.assign(scope,{
-              row:tableForm,
-              index:tableIndex
+              row:item.dynamic?scope.row:tableForm,
+              index:item.dynamic?scope.row.$index:tableIndex
               })"
-              :name="item.prop+'Form'"
-              v-if="item.formslot"></slot>
+              v-if="item.formslot"
+              :name="item.prop+'Form'"></slot>
       </template>
       <template slot-scope="scope"
                 v-for="item in columnFormOption"
@@ -280,15 +285,17 @@
               :name="item.prop+'Error'"
               v-if="item.errorslot"></slot>
       </template>
-      <template slot-scope="{tableForm,boxType,size}"
+      <template slot-scope="{tableForm,type,size,disabled}"
                 slot="menuForm">
         <slot name="menuForm"
               :size="size"
-              :type="boxType"></slot>
+              :disabled="disabled"
+              :type="type"></slot>
       </template>
     </dialog-form>
     <!-- 动态列 -->
-    <dialog-column ref="dialogColumn"></dialog-column>
+    <dialog-column ref="dialogColumn"
+                   :show-column="showColumn"></dialog-column>
     <!-- 过滤器 -->
     <keep-alive>
       <dialog-filter ref="dialogFilter"></dialog-filter>
@@ -360,8 +367,6 @@ export default create({
   mounted () {
     this.doLayout = false;
     this.$nextTick(() => {
-      //初始化dialogForm对外方法
-      this.dialogFormFun();
       this.doLayout = true;
       //如果有搜索激活搜索
       if (this.$refs.headerSearch) this.$refs.headerSearch.init();
@@ -400,6 +405,15 @@ export default create({
       }
       return result;
     },
+    isTree () {
+      let flag = false;
+      this.data.forEach(ele => {
+        if (ele.children) {
+          flag = true;
+        }
+      })
+      return this.vaildData(this.tableOption.tree, flag);
+    },
     isGroup () {
       return !this.validatenull(this.tableOption.group);
     },
@@ -409,8 +423,24 @@ export default create({
     isSortable () {
       return this.tableOption.sortable;
     },
+    dynamicOption () {
+      let list = [];
+      this.propOption.forEach(ele => {
+        if (ele.prop === 'dynamic') {
+          list = list.concat(ele.children.column.map(item => {
+            return Object.assign(item, {
+              dynamic: true
+            })
+          }));
+        }
+      })
+      return list;
+    },
     columnFormOption () {
       let list = [];
+      this.propOption.forEach(column => {
+        list.push(column);
+      });
       if (this.isGroup) {
         this.groupOption.forEach(ele => {
           if (!ele.column) return;
@@ -418,10 +448,8 @@ export default create({
             list.push(column);
           });
         });
-      } else {
-        list = this.propOption;
       }
-      return list;
+      return list.concat(this.dynamicOption);
     },
     expandLevel () {
       return this.parentOption.expandLevel || 0;
@@ -468,18 +496,6 @@ export default create({
     }
   },
   props: {
-    permission: {
-      type: Object,
-      default: () => {
-        return {};
-      }
-    },
-    value: {
-      type: Object,
-      default: () => {
-        return {};
-      }
-    },
     sortBy: Function,
     sortOrders: Function,
     sortMethod: Function,
@@ -496,6 +512,25 @@ export default create({
     uploadAfter: Function,
     uploadDelete: Function,
     uploadPreview: Function,
+    uploadError: Function,
+    permission: {
+      type: Object,
+      default: () => {
+        return {};
+      }
+    },
+    value: {
+      type: Object,
+      default: () => {
+        return {};
+      }
+    },
+    showColumn: {
+      type: Array,
+      default () {
+        return [];
+      }
+    },
     page: {
       type: Object,
       default () {
@@ -553,8 +588,11 @@ export default create({
       })
     },
     //树懒加载
-    treeload (tree, treeNode, resolve) {
-      this.$emit('tree-load', tree, treeNode, resolve)
+    treeLoad (tree, treeNode, resolve) {
+      this.$emit('tree-load', tree, treeNode, (data) => {
+        tree.children = data;
+        resolve(data);
+      })
     },
     // 格式化数据源
     formatData () {
@@ -594,7 +632,7 @@ export default create({
       });
     },
     menuIcon (value) {
-      return this.menuType === "icon" ? "" : this.t("crud." + value);
+      return this.menuType === "icon" ? "" : (this.vaildData(this.tableOption[value + 'Text'], this.t("crud." + value)));
     },
     menuText (value) {
       return this.menuType === "text" ? "text" : value;
@@ -769,9 +807,9 @@ export default create({
     },
     //单元格更新
     rowCellUpdate (row, index) {
-      this.btnDisabled = true;
       this.asyncValidator(this.formCellRules, row)
         .then(res => {
+          this.btnDisabled = true;
           this.$emit(
             "row-update",
             row,
@@ -786,17 +824,20 @@ export default create({
           );
         })
         .catch(errors => {
-          this.$message.warning(errors[0]);
+          this.$message.error(`第${index + 1}行:${errors[0].message}`);
         });
     },
     rowAdd () {
       this.$refs.dialogForm.show("add");
     },
-    dialogFormFun () {
-      let list = ['updateDic', 'rowSave', 'rowUpdate', 'closeDialog']
-      list.forEach(ele => {
-        this[ele] = (this.$refs.dialogForm | {})[ele];
-      })
+    rowSave () {
+      return this.$refs.dialogForm.$refs.tableForm.submit();
+    },
+    rowUpdate () {
+      return this.$refs.dialogForm.$refs.tableForm.submit();
+    },
+    closeDialog () {
+      return this.$refs.dialogForm.closeDialog()
     },
     //对象克隆
     rowClone (row) {
@@ -831,18 +872,38 @@ export default create({
       this.tableIndex = index;
       this.$refs.dialogForm.show("view");
     },
+    vaildParent (row) {
+      return this.validatenull(row.parentId)
+    },
     // 删除
     rowDel (row, index) {
-      this.$emit("row-del", row, index);
+      this.$emit("row-del", row, index, () => {
+        const callback = (list = []) => {
+          let index = list.findIndex(ele => ele[this.rowKey] === row[this.rowKey])
+          list.splice(index, 1);
+        }
+        if (this.isTree) {
+          if (this.vaildParent(row)) {
+            callback(this.data)
+          } else {
+            let parent = this.findObject(this.data, row.parentId, this.rowKey);
+
+            if (parent === undefined) {
+              callback(this.data)
+            } else {
+              callback(parent.children)
+            }
+          }
+        } else {
+          callback(this.data)
+        }
+
+      });
     },
     //清空表单
     resetForm () {
       this.$refs.dialogForm.resetForm();
       this.$emit("input", this.tableForm);
-    },
-    //搜索指定的属性配置
-    findColumnIndex (value) {
-      return this.findArray(this.propOption, value, "prop");
     },
     //合并行
     tableSpanMethod (param) {

@@ -107,12 +107,14 @@ export const getSearchType = (column, component = false) => {
         result = type;
       }
     } else {
-      result = 'date';
+      result = type;
     }
   } else if (['cascader'].includes(type)) {
     result = 'cascader';
   } else if (['number'].includes(type)) {
     result = 'input-number';
+  } else if (['textarea'].includes(type)) {
+    result = 'input';
   }
   if (component) {
     result = KEY_COMPONENT_NAME + result;
@@ -127,13 +129,15 @@ export const getSearchType = (column, component = false) => {
 export const getComponent = (type, component) => {
   let result = 'input';
   if (!validatenull(component)) {
-    result = component;
+    return component;
   } else if (['img', 'array'].includes(type)) {
     result = 'array';
   } else if (type === 'select') {
     result = 'select';
   } else if (type === 'radio') {
     result = 'radio';
+  } else if (type === 'tree') {
+    result = 'input-tree';
   } else if (type === 'checkbox') {
     result = 'checkbox';
   } else if (['time', 'timerange'].includes(type)) {

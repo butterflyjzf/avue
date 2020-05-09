@@ -64,26 +64,12 @@
                 </span>
                 <span v-else-if="column.parentProp"
                       v-html="handleDetail(scope.row,column,(crud.cascaderDIC[scope.row.$index] || {})[column.prop])"></span>
-
-                <template v-else-if="['upload'].includes(column.type)">
-                  <avue-img :align="column.align"
-                            :listType="column.listType"
-                            :imgWidth="column.imgWidth"
-                            :fullscreen="column.imgFullscreen"
-                            :imgHeight="column.imgHeight"
-                            :imgType="column.imgType"
-                            :type="menuText()"
-                            :dataType="column.dataType"
-                            :size="crud.isMediumSize"
-                            :value="scope.row[column.prop]"
-                            v-if="scope.row[column.prop]"></avue-img>
-                </template>
-                <span v-else-if="['img'].includes(column.type)">
+                <span v-else-if="['img','upload'].includes(column.type)">
                   <div class="avue-crud__img">
-                    <img v-for="(item,index) in detailData(scope.row[column.prop],column.dataType)"
+                    <img v-for="(item,index) in getImgList(scope,column)"
                          :src="item"
                          :key="index"
-                         @click="openImg(detailData(scope.row[column.prop],column.dataType),index)" />
+                         @click="openImg(getImgList(scope,column),index)" />
                   </div>
                 </span>
                 <span v-else-if="['url'].includes(column.type)">
@@ -149,6 +135,7 @@ export default {
       "handleChange",
       "cellEditFlag",
       "iconShow",
+      "getImgList",
       "toggleExpanded",
       "handleFiltersMethod",
       "handleFilters"

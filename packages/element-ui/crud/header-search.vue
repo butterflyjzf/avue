@@ -10,6 +10,7 @@
         <template slot="menuForm"
                   slot-scope="{size}">
           <slot name="searchMenu"
+                :row="searchForm"
                 :size="size"></slot>
         </template>
         <template :slot="item.prop"
@@ -24,6 +25,12 @@
                 :row="searchForm"
                 :name="item.prop"
                 v-if="item.searchslot"></slot>
+        </template>
+        <template slot="search"
+                  slot-scope="{}">
+          <slot name="search"
+                :row="searchForm"
+                :size="crud.controlSize"></slot>
         </template>
       </avue-form>
     </div>
@@ -43,7 +50,7 @@ import {
 } from "core/dataformat";
 import config from "./config";
 export default cteate({
-  name: "crud-search",
+  name: "crud__search",
   inject: ["crud"],
   mixins: [locale],
   data () {
@@ -93,9 +100,9 @@ export default cteate({
           if (ele.search) {
             ele = Object.assign(ele, {
               type: getSearchType(ele),
-              multiple: ['checkbox'].includes(ele.type),
+              multiple: ele.searchMultiple,
               span: ele.searchSpan || this.config.searchSpan,
-              labelWidth: ele.searchLabelWidth || option.searchSpan || this.config.searchLabelWidth,
+              labelWidth: ele.searchLabelWidth || option.searchLabelWidth || this.config.searchLabelWidth,
               tip: ele.searchTip,
               placeholder: getPlaceholder(ele, 'search'),
               filterable: ele.searchFilterable,
@@ -126,16 +133,19 @@ export default cteate({
         if (result.group) {
           delete result.group;
         }
-        result.column = detailColumn(result.column)
+        result.column = detailColumn(this.deepClone(this.crud.columnFormOption))
         result = Object.assign(result, {
+          tabs: false,
+          printBtn: false,
+          mockBtn: false,
           size: this.crud.isMediumSize,
           gutter: option.searchGutter || this.config.searchGutter,
           labelWidth: option.searchLabelWidth || this.config.searchLabelWidth,
-          submitText: this.vaildData(option.searchSubText, '查询'),
-          submitBtn: this.vaildData(option.searchSubBtn, this.config.searchSubBtn),
+          submitText: this.vaildData(option.searchBtnText, this.t('crud.searchBtn')),
+          submitBtn: this.vaildData(option.searchBtn, this.config.searchSubBtn),
           submitIcon: option.searchBtnIcon || this.config.searchBtnIcon,
-          emptyText: this.vaildData(option.searchResetText, '清空'),
-          emptyBtn: this.vaildData(option.searchResetBtn, this.config.searchResetBtn),
+          emptyText: this.vaildData(option.emptyBtnText, this.t('crud.emptyBtn')),
+          emptyBtn: this.vaildData(option.emptyBtn, this.config.emptyBtn),
           emptyIcon: option.emptyBtnIcon || this.config.emptyBtnIcon,
           menuSpan: option.searchMenuSpan,
           dicFlag: false,

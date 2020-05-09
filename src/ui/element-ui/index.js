@@ -12,7 +12,6 @@ import Comment from 'components/comment';
 import Form from 'components/form';
 import Checkbox from 'components/checkbox';
 import Date from 'components/date';
-import Detail from 'components/detail';
 import Draggable from 'components/draggable';
 import Empty from 'components/empty';
 import Flow from 'components/flow';
@@ -25,6 +24,7 @@ import Radio from 'components/radio';
 import Select from 'components/select';
 import Cascader from 'components/cascader';
 import InputNumber from 'components/input-number';
+import InputTree from 'components/input-tree';
 import Verifys from 'components/verify';
 import Switchs from 'components/switch';
 import Rate from 'components/rate';
@@ -80,13 +80,13 @@ export default [
   Select,
   Cascader,
   InputNumber,
+  InputTree,
   Switchs,
   Rate,
   Upload,
   Slider,
   Img,
   Keyboard,
-  Detail,
   Group,
   Tree,
   Search,

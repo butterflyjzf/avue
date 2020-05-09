@@ -216,7 +216,9 @@ export default (() => {
             const detail = (res) => {
               // 处理返回的数据
               const result = (() => {
-                if (typeof this.dataFormatter === 'function') this.dataFormatter(res.data);
+                if (typeof this.dataFormatter === 'function') {
+                  return this.dataFormatter(res.data);
+                };
                 return res.data || {};
               })();
               // 延迟效果数据逐步增加
@@ -238,7 +240,7 @@ export default (() => {
             };
             let result = getUrlParams(dataUrl);
             let url = result.url;
-            let params = Object.assign(this.dataQuery, result.params, this.propQuery);
+            let params = Object.assign(result.params, this.dataQuery, this.propQuery);
             this.$httpajax[this.dataMethod](url, (() => {
               if (this.dataMethod === 'get') {
                 return {

@@ -2,9 +2,10 @@
   <component :is="getComponent(column.type,column.component)"
              v-model="text"
              v-bind="column"
-             :column="column"
+             :column="Object.assign(column,params)"
              :dic="dic"
              :disabled="disabled"
+             :readonly="readonly"
              :placeholder="getPlaceholder(column)"
              :props="column.props || props"
              :propsHttp="column.propsHttp || propsHttp"
@@ -14,15 +15,30 @@
              :upload-before="uploadBefore"
              :upload-after="uploadAfter"
              :upload-delete="uploadDelete"
+             :upload-error="uploadError"
              @keyup.enter.native="enterChange"
              @change="handleChange">
+    <span v-if="params.html"
+          v-html="params.html"></span>
     <template :slot="column.prop+'Type'"
-              slot-scope="{item,label,value}"
+              slot-scope="{item,label,value,node,data}"
               v-if="column.typeslot">
       <slot :name="column.prop+'Type'"
             :item="item"
+            :node="node"
+            :data="data"
             :value="value"
             :label="label"></slot>
+    </template>
+    <template :slot="item.prop"
+              v-for="item in columnOption"
+              slot-scope="scope">
+      <slot :row="scope.row"
+            :dic="scope.dic"
+            v-if="item.slot"
+            :size="scope.size"
+            :name="item.prop"
+            :label="scope.label"></slot>
     </template>
   </component>
 </template>
@@ -38,6 +54,7 @@ export default {
     uploadDelete: Function,
     uploadAfter: Function,
     uploadPreview: Function,
+    uploadError: Function,
     props: {
       type: Object
     },
@@ -72,6 +89,9 @@ export default {
     disabled: {
       type: Boolean
     },
+    readonly: {
+      type: Boolean
+    },
     column: {
       type: Object,
       default: () => {
@@ -83,6 +103,14 @@ export default {
     return {
       first: false,
       text: undefined,
+    }
+  },
+  computed: {
+    params () {
+      return this.column.params || {}
+    },
+    columnOption () {
+      return ((this.column.children || []).column) || []
     }
   },
   watch: {

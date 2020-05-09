@@ -1,17 +1,17 @@
 <template>
-  <div :class="b('pagination')">
-    <el-pagination :small="crud.isMobile"
-                   :hide-on-single-page="vaildData(crud.tableOption.simplePage,config.simplePage)"
-                   :pager-count="defaultPage.pagerCount"
-                   :current-page.sync="defaultPage.currentPage"
-                   :background="vaildData(defaultPage.pageBackground,config.pageBackground)"
-                   :page-size="defaultPage.pageSize"
-                   :page-sizes="defaultPage.pageSizes"
-                   @size-change="sizeChange"
-                   @current-change="currentChange"
-                   layout="total, sizes, prev, pager, next, jumper"
-                   :total="defaultPage.total"></el-pagination>
-  </div>
+  <el-pagination :class="b('pagination')"
+                 v-show="pageFlag"
+                 :small="crud.isMobile"
+                 :hide-on-single-page="vaildData(crud.tableOption.simplePage,config.simplePage)"
+                 :pager-count="defaultPage.pagerCount"
+                 :current-page.sync="defaultPage.currentPage"
+                 :background="vaildData(defaultPage.pageBackground,config.pageBackground)"
+                 :page-size="defaultPage.pageSize"
+                 :page-sizes="defaultPage.pageSizes"
+                 @size-change="sizeChange"
+                 @current-change="currentChange"
+                 layout="total, sizes, prev, pager, next, jumper"
+                 :total="defaultPage.total"></el-pagination>
 </template>
 
 <script>
@@ -57,6 +57,7 @@ export default create({
       if (this.defaultPage.total === (this.defaultPage.currentPage - 1) * this.defaultPage.pageSize && this.defaultPage.total != 0) {
         this.defaultPage.currentPage = this.defaultPage.currentPage - 1;
         this.crud.$emit("on-load", this.defaultPage);
+        this.crud.$emit("current-change", this.defaultPage.currentPage);
         this.updateValue();
       }
     }
